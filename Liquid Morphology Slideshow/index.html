@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid Morphology Slideshow</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            bottom: 40px;
+            left: 40px;
+            color: rgba(255, 255, 255, 0.8);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .title {
+            font-size: 14px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .instruction {
+            font-size: 12px;
+            opacity: 0.5;
+            letter-spacing: 1px;
+        }
+
+        #loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 14px;
+            letter-spacing: 2px;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">LOADING ASSETS...</div>
+
+    <div id="canvas-container"></div>
+
+    <div class="ui-overlay">
+        <div class="title">Liquid Morphology</div>
+        <div class="instruction">Click to Morph</div>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <script>
+        // --- CONFIGURATION ---
+        const IMAGES = [
+            'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80', // Fluid Abstract
+            'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80', // Purple Liquid
+            'https://images.unsplash.com/photo-1504198458649-3128b932f49e?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80', // Dark Storm
+            'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80'  // Gradient
+        ];
+
+        // --- SHADERS ---
+
+        const vertexShader = `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            uniform float time;
+            uniform float progress;
+            uniform sampler2D texture1;
+            uniform sampler2D texture2;
+            uniform vec2 resolution;
+            uniform vec2 imageResolution;
+
+            varying vec2 vUv;
+
+            #define PI 3.14159265359
+
+            // Simple noise function
+            float hash(float n) { return fract(sin(n) * 43758.5453123); }
+            float noise(vec2 x) {
+                vec2 p = floor(x);
+                vec2 f = fract(x);
+                f = f*f*(3.0-2.0*f);
+                float n = p.x + p.y*57.0;
+                return mix(mix(hash(n+0.0), hash(n+1.0),f.x), mix(hash(n+57.0), hash(n+58.0),f.x),f.y);
+            }
+
+            // Aspect Ratio Correction to "Cover"
+            vec2 getCoverUv(vec2 uv, vec2 resolution, vec2 imageResolution) {
+                vec2 ratio = vec2(
+                    min((resolution.x / resolution.y) / (imageResolution.x / imageResolution.y), 1.0),
+                    min((resolution.y / resolution.x) / (imageResolution.y / imageResolution.x), 1.0)
+                );
+                return vec2(
+                    uv.x * ratio.x + (1.0 - ratio.x) * 0.5,
+                    uv.y * ratio.y + (1.0 - ratio.y) * 0.5
+                );
+            }
+
+            void main() {
+                vec2 uv = getCoverUv(vUv, resolution, imageResolution);
+
+                // Distortion Logic
+                // We create a sine wave pattern that moves with time and intensifies with progress
+                float wave = sin(uv.y * 10.0 + time * 0.5);
+
+                // Displacement strength bell curve (peaks at progress = 0.5)
+                float strength = smoothstep(0.0, 1.0, progress) * 2.0;
+                if(progress > 0.5) strength = (1.0 - progress) * 4.0;
+                // Wait, easier bell curve: sin(progress * PI)
+                float dispIntensity = sin(progress * PI) * 0.2; // 0.2 is the max distortion amount
+
+                // Create a flowing distortion vector
+                vec2 distortedPosition = vec2(
+                    uv.x + noise(uv * 5.0 + time) * dispIntensity * wave,
+                    uv.y + noise(uv * 10.0 + time) * dispIntensity
+                );
+
+                // Sample textures
+                // We distort the UVs for the texture lookup
+                vec4 t1 = texture2D(texture1, (uv - 0.5) * (1.0 - progress * 0.1) + 0.5 + distortedPosition * 0.5);
+                vec4 t2 = texture2D(texture2, (uv - 0.5) * (1.0 + (1.0-progress) * 0.1) + 0.5 + distortedPosition * 0.5);
+
+                // Mix logic
+                // Instead of simple mix, let's use a noisy threshold for a "dissolve" edge
+                float noiseVal = noise(uv * 20.0 + time);
+                float mixFactor = smoothstep(0.4, 0.6, progress + (noiseVal - 0.5) * 0.2); // Soft edge
+
+                // Standard crossfade with our calculated mix factor, but heavily influenced by the liquid movement
+                gl_FragColor = mix(t1, t2, progress);
+
+                // Optional: Add a subtle RGB shift based on velocity (approximated by displacement)
+                // This makes it look more "glassy"
+                // This part is skipped for performance/simplicity, staying with the morph.
+            }
+        `;
+
+        // --- APP CLASS ---
+
+        class App {
+            constructor() {
+                this.container = document.getElementById('canvas-container');
+                this.width = this.container.offsetWidth;
+                this.height = this.container.offsetHeight;
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.setSize(this.width, this.height);
+                this.container.appendChild(this.renderer.domElement);
+
+                this.camera = new THREE.OrthographicCamera(
+                    this.width / -2, this.width / 2, this.height / 2, this.height / -2, 1, 1000
+                );
+                this.camera.position.z = 1;
+
+                this.scene = new THREE.Scene();
+
+                this.clock = new THREE.Clock();
+                this.textures = [];
+                this.currentSlide = 0;
+                this.isAnimating = false;
+
+                this.init();
+            }
+
+            async init() {
+                await this.loadTextures();
+                this.addObjects();
+                this.resize();
+                this.addListeners();
+                this.render();
+
+                // Hide loader
+                document.getElementById('loader').style.opacity = 0;
+            }
+
+            loadTextures() {
+                const loader = new THREE.TextureLoader();
+                const promises = IMAGES.map(url => {
+                    return new Promise((resolve) => {
+                        loader.load(url, (tex) => {
+                            tex.minFilter = THREE.LinearFilter;
+                            tex.magFilter = THREE.LinearFilter;
+                            resolve(tex);
+                        });
+                    });
+                });
+                return Promise.all(promises).then(loadedTextures => {
+                    this.textures = loadedTextures;
+                });
+            }
+
+            addObjects() {
+                // Plane covers the view
+                this.geometry = new THREE.PlaneGeometry(this.width, this.height, 1, 1);
+
+                // Shader Uniforms
+                this.material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        progress: { value: 0 },
+                        texture1: { value: this.textures[0] },
+                        texture2: { value: this.textures[1] },
+                        resolution: { value: new THREE.Vector2(this.width, this.height) },
+                        imageResolution: { value: new THREE.Vector2(1920, 1080) } // Assuming roughly standard aspect
+                    },
+                    vertexShader: vertexShader,
+                    fragmentShader: fragmentShader,
+                    side: THREE.DoubleSide
+                });
+
+                this.mesh = new THREE.Mesh(this.geometry, this.material);
+                this.scene.add(this.mesh);
+            }
+
+            resize() {
+                this.width = this.container.offsetWidth;
+                this.height = this.container.offsetHeight;
+
+                this.renderer.setSize(this.width, this.height);
+
+                // Update camera
+                this.camera.left = this.width / -2;
+                this.camera.right = this.width / 2;
+                this.camera.top = this.height / 2;
+                this.camera.bottom = this.height / -2;
+                this.camera.updateProjectionMatrix();
+
+                // Update geometry to fit full screen
+                if(this.mesh) {
+                    this.mesh.geometry.dispose();
+                    this.mesh.geometry = new THREE.PlaneGeometry(this.width, this.height, 1, 1);
+                }
+
+                // Update Uniforms
+                if (this.material) {
+                    this.material.uniforms.resolution.value.x = this.width;
+                    this.material.uniforms.resolution.value.y = this.height;
+                }
+            }
+
+            nextSlide() {
+                if (this.isAnimating) return;
+                this.isAnimating = true;
+
+                // Prepare next texture index
+                const nextIndex = (this.currentSlide + 1) % this.textures.length;
+
+                // Set textures
+                this.material.uniforms.texture1.value = this.textures[this.currentSlide];
+                this.material.uniforms.texture2.value = this.textures[nextIndex];
+
+                // Animate progress uniform
+                gsap.to(this.material.uniforms.progress, {
+                    value: 1,
+                    duration: 1.5,
+                    ease: "power2.inOut",
+                    onComplete: () => {
+                        // Reset for next cycle
+                        this.currentSlide = nextIndex;
+                        this.material.uniforms.texture1.value = this.textures[this.currentSlide];
+                        this.material.uniforms.progress.value = 0;
+                        this.isAnimating = false;
+                    }
+                });
+            }
+
+            addListeners() {
+                window.addEventListener('resize', this.resize.bind(this));
+
+                // Mouse/Touch click to change slide
+                window.addEventListener('click', this.nextSlide.bind(this));
+                window.addEventListener('touchstart', this.nextSlide.bind(this));
+            }
+
+            render() {
+                this.material.uniforms.time.value = this.clock.getElapsedTime();
+                this.renderer.render(this.scene, this.camera);
+                requestAnimationFrame(this.render.bind(this));
+            }
+        }
+
+        // Initialize App once DOM is ready
+        window.onload = () => {
+            new App();
+        };
+
+    </script>
+</body>
+</html>
