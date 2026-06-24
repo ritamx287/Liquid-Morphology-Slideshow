@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Portfolio Grid</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <!-- Three.js & GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            background-color: #050505;
+            color: #ffffff;
+            font-family: 'Space Grotesk', sans-serif;
+            overflow-x: hidden; /* Hide horizontal scrollbar */
+        }
+
+        /* The canvas sits behind the content but in front of the background color */
+        #webgl-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1; /* Behind HTML content */
+            pointer-events: none; /* Let clicks pass through to HTML if needed */
+        }
+
+        /* The image container in HTML.
+           The actual <img> is invisible (opacity 0) but takes up space
+           so the browser handles the layout logic for us.
+        */
+        .project-img {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        /* When JS loads, we might show a loader, but here we just start invisible */
+        .is-loaded .project-img {
+            /* Keep it invisible, Three.js renders it.
+               Toggle this to 1 to debug layout vs canvas pos. */
+            opacity: 0;
+        }
+
+        .project-card {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Text overlay styling */
+        .project-info {
+            pointer-events: none; /* Let mouse hover hit the container/img behind */
+            mix-blend-mode: difference;
+        }
+
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #050505;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fixed Background Canvas -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- Main Content -->
+    <main class="relative z-10 w-full min-h-screen pb-20">
+
+        <!-- Header -->
+        <header class="w-full px-8 py-12 md:px-16 md:py-24">
+            <h1 class="text-5xl md:text-8xl font-bold tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-500">
+                Selected Work
+            </h1>
+            <p class="text-gray-400 text-lg md:text-xl max-w-xl leading-relaxed">
+                A collection of digital experiences exploring the boundary between DOM layout and WebGL interactions. Hover over images to trigger the distortion.
+            </p>
+        </header>
+
+        <!-- Grid Container -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-24 px-8 md:px-16 max-w-[1600px] mx-auto" id="grid-container">
+
+            <!-- Project 1 -->
+            <div class="project-card group cursor-pointer">
+                <div class="relative w-full aspect-[4/3] mb-6 overflow-hidden bg-gray-900/20">
+                    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop"
+                         alt="Abstract Fluids"
+                         class="project-img w-full h-full object-cover"
+                         data-texture-src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800&auto=format&fit=crop">
+                </div>
+                <div class="project-info flex justify-between items-end border-t border-gray-800 pt-4">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-1 group-hover:text-cyan-400 transition-colors">Nebula</h2>
+                        <p class="text-sm text-gray-400 uppercase tracking-widest">WebGL / Interaction</p>
+                    </div>
+                    <span class="text-xl">01</span>
+                </div>
+            </div>
+
+            <!-- Project 2 -->
+            <div class="project-card group cursor-pointer md:mt-24">
+                <div class="relative w-full aspect-[4/5] mb-6 overflow-hidden bg-gray-900/20">
+                    <img src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=1000&auto=format&fit=crop"
+                         alt="Neon City"
+                         class="project-img w-full h-full object-cover"
+                         data-texture-src="https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=800&auto=format&fit=crop">
+                </div>
+                <div class="project-info flex justify-between items-end border-t border-gray-800 pt-4">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-1 group-hover:text-purple-400 transition-colors">Synthwave</h2>
+                        <p class="text-sm text-gray-400 uppercase tracking-widest">Creative Coding</p>
+                    </div>
+                    <span class="text-xl">02</span>
+                </div>
+            </div>
+
+            <!-- Project 3 -->
+            <div class="project-card group cursor-pointer">
+                <div class="relative w-full aspect-[4/3] mb-6 overflow-hidden bg-gray-900/20">
+                    <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop"
+                         alt="Dark Matter"
+                         class="project-img w-full h-full object-cover"
+                         data-texture-src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=800&auto=format&fit=crop">
+                </div>
+                <div class="project-info flex justify-between items-end border-t border-gray-800 pt-4">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-1 group-hover:text-emerald-400 transition-colors">Entropy</h2>
+                        <p class="text-sm text-gray-400 uppercase tracking-widest">Generative Art</p>
+                    </div>
+                    <span class="text-xl">03</span>
+                </div>
+            </div>
+
+            <!-- Project 4 -->
+            <div class="project-card group cursor-pointer md:mt-24">
+                <div class="relative w-full aspect-[3/4] mb-6 overflow-hidden bg-gray-900/20">
+                    <img src="https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1000&auto=format&fit=crop"
+                         alt="Architecture"
+                         class="project-img w-full h-full object-cover"
+                         data-texture-src="https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=800&auto=format&fit=crop">
+                </div>
+                <div class="project-info flex justify-between items-end border-t border-gray-800 pt-4">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-1 group-hover:text-orange-400 transition-colors">Brutalist</h2>
+                        <p class="text-sm text-gray-400 uppercase tracking-widest">Photography</p>
+                    </div>
+                    <span class="text-xl">04</span>
+                </div>
+            </div>
+             <!-- Project 5 -->
+             <div class="project-card group cursor-pointer">
+                <div class="relative w-full aspect-[16/9] mb-6 overflow-hidden bg-gray-900/20">
+                    <img src="https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=1000&auto=format&fit=crop"
+                         alt="Liquid Gold"
+                         class="project-img w-full h-full object-cover"
+                         data-texture-src="https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=800&auto=format&fit=crop">
+                </div>
+                <div class="project-info flex justify-between items-end border-t border-gray-800 pt-4">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-1 group-hover:text-yellow-400 transition-colors">Flux</h2>
+                        <p class="text-sm text-gray-400 uppercase tracking-widest">Simulation</p>
+                    </div>
+                    <span class="text-xl">05</span>
+                </div>
+            </div>
+
+             <!-- Project 6 -->
+             <div class="project-card group cursor-pointer md:mt-24">
+                <div class="relative w-full aspect-square mb-6 overflow-hidden bg-gray-900/20">
+                    <img src="https://images.unsplash.com/photo-1605218427306-6354db696fc3?q=80&w=1000&auto=format&fit=crop"
+                         alt="Sculpture"
+                         class="project-img w-full h-full object-cover"
+                         data-texture-src="https://images.unsplash.com/photo-1605218427306-6354db696fc3?q=80&w=800&auto=format&fit=crop">
+                </div>
+                <div class="project-info flex justify-between items-end border-t border-gray-800 pt-4">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-1 group-hover:text-pink-400 transition-colors">Statue</h2>
+                        <p class="text-sm text-gray-400 uppercase tracking-widest">3D Scan</p>
+                    </div>
+                    <span class="text-xl">06</span>
+                </div>
+            </div>
+
+        </div>
+
+        <footer class="mt-32 px-8 py-12 border-t border-gray-900 text-center text-gray-600">
+            <p>Scroll to explore &bull; Hover to distort</p>
+        </footer>
+    </main>
+
+    <!-- SHADERS -->
+    <script type="x-shader/x-vertex" id="vertexShader">
+        uniform float uTime;
+        uniform float uHover;
+        uniform vec2 uMouse;
+
+        varying vec2 vUv;
+
+        void main() {
+            vUv = uv;
+            vec3 pos = position;
+
+            // Simple sine wave ripple effect driven by hover
+            // We use UV coordinates to create the wave pattern
+            float noiseFreq = 3.5;
+            float noiseAmp = 0.15; // Amplitude of the z-displacement
+
+            // Only apply wave when hovering (uHover goes 0 -> 1)
+            vec2 noisePos = vec2(pos.x * noiseFreq + uTime, pos.y * noiseFreq + uTime);
+
+            // Calculate distance from center for a more contained effect if desired,
+            // but here we just ripple the whole plane.
+            pos.z += sin(noisePos.x) * cos(noisePos.y) * noiseAmp * uHover;
+
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+    </script>
+
+    <script type="x-shader/x-fragment" id="fragmentShader">
+        uniform sampler2D uTexture;
+        uniform float uHover;
+        uniform float uTime;
+
+        varying vec2 vUv;
+
+        void main() {
+            vec2 uv = vUv;
+
+            // RGB Shift Calculation
+            // We shift the Red and Blue channels in opposite directions based on uHover
+            float shiftStrength = 0.02 * uHover;
+
+            vec4 color;
+
+            // Red Channel Shift
+            color.r = texture2D(uTexture, uv + vec2(shiftStrength, 0.0)).r;
+
+            // Green Channel (No shift)
+            color.g = texture2D(uTexture, uv).g;
+
+            // Blue Channel Shift
+            color.b = texture2D(uTexture, uv - vec2(shiftStrength, 0.0)).b;
+
+            // Alpha
+            color.a = texture2D(uTexture, uv).a;
+
+            // Slightly brighten on hover
+            color.rgb += uHover * 0.05;
+
+            gl_FragColor = color;
+        }
+    </script>
+
+    <!-- Main Application Script -->
+    <script>
+        class PortfolioScene {
+            constructor() {
+                this.container = document.querySelector('main');
+                this.canvas = document.querySelector('#webgl-canvas');
+
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+
+                this.scroll = {
+                    current: 0,
+                    target: 0,
+                    ease: 0.1
+                };
+
+                this.items = []; // Will store { mesh, img, bounds } objects
+
+                this.init();
+            }
+
+            init() {
+                this.createScene();
+                this.createCamera();
+                this.createRenderer();
+                this.addObjects();
+                this.addEventListeners();
+                this.animate();
+            }
+
+            createScene() {
+                this.scene = new THREE.Scene();
+            }
+
+            createCamera() {
+                // Perspective camera with field of view calculated to match HTML pixels 1:1 at z=0
+                const fov = 45;
+                this.camera = new THREE.PerspectiveCamera(fov, this.width / this.height, 0.1, 1000);
+                this.camera.position.z = 600; // Arbitrary start, will be recalculated in updateSize
+
+                // Formula to align DOM pixels with WebGL units
+                // We need to know how far away the camera must be for 1 WebGL unit to equal 1 pixel height
+                this.camera.fov = 2 * Math.atan((this.height / 2) / 600) * (180 / Math.PI);
+            }
+
+            createRenderer() {
+                this.renderer = new THREE.WebGLRenderer({
+                    canvas: this.canvas,
+                    alpha: true,
+                    antialias: true
+                });
+                this.renderer.setSize(this.width, this.height);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            }
+
+            addObjects() {
+                const images = [...document.querySelectorAll('img.project-img')];
+                const textureLoader = new THREE.TextureLoader();
+
+                // Material config
+                const materialBase = new THREE.ShaderMaterial({
+                    vertexShader: document.getElementById('vertexShader').textContent,
+                    fragmentShader: document.getElementById('fragmentShader').textContent,
+                    uniforms: {
+                        uTime: { value: 0 },
+                        uHover: { value: 0 },
+                        uTexture: { value: null }
+                    },
+                    side: THREE.DoubleSide
+                    // wireframe: true // Debug mode
+                });
+
+                images.forEach((img, index) => {
+                    const bounds = img.getBoundingClientRect();
+
+                    // Create Geometry matching image aspect ratio
+                    const geometry = new THREE.PlaneGeometry(1, 1, 20, 20); // 20 segments for wave effect
+
+                    // Clone material so each has its own texture and hover state
+                    const material = materialBase.clone();
+
+                    // Load texture
+                    textureLoader.load(img.dataset.textureSrc, (texture) => {
+                        texture.minFilter = THREE.LinearFilter;
+                        texture.generateMipmaps = false;
+                        material.uniforms.uTexture.value = texture;
+                        // Determine scale to cover (like object-fit: cover) if needed,
+                        // but here we match DOM exact size so CSS object-fit does the work,
+                        // and we just map the texture 1:1.
+                        material.needsUpdate = true;
+                    });
+
+                    const mesh = new THREE.Mesh(geometry, material);
+
+                    this.scene.add(mesh);
+
+                    // Store reference
+                    this.items.push({
+                        img: img,
+                        mesh: mesh,
+                        top: bounds.top,
+                        left: bounds.left,
+                        width: bounds.width,
+                        height: bounds.height,
+                        isHovered: false
+                    });
+
+                    // Add hover listeners to the DOM element (parent container for larger hit area)
+                    const card = img.closest('.project-card');
+
+                    card.addEventListener('mouseenter', () => {
+                        this.onMouseEnter(index);
+                    });
+                    card.addEventListener('mouseleave', () => {
+                        this.onMouseLeave(index);
+                    });
+                });
+            }
+
+            onMouseEnter(index) {
+                if(this.items[index]) {
+                    gsap.to(this.items[index].mesh.material.uniforms.uHover, {
+                        value: 1,
+                        duration: 0.5,
+                        ease: 'power2.out'
+                    });
+
+                    // Optional: Scale up mesh slightly
+                    // gsap.to(this.items[index].mesh.scale, {
+                    //     x: this.items[index].width * 1.05,
+                    //     y: this.items[index].height * 1.05,
+                    //     duration: 0.5
+                    // });
+                }
+            }
+
+            onMouseLeave(index) {
+                if(this.items[index]) {
+                    gsap.to(this.items[index].mesh.material.uniforms.uHover, {
+                        value: 0,
+                        duration: 0.5,
+                        ease: 'power2.out'
+                    });
+
+                    // Reset Scale
+                    // gsap.to(this.items[index].mesh.scale, {
+                    //     x: this.items[index].width,
+                    //     y: this.items[index].height,
+                    //     duration: 0.5
+                    // });
+                }
+            }
+
+            updateSize() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+
+                this.renderer.setSize(this.width, this.height);
+                this.camera.aspect = this.width / this.height;
+
+                // Recalculate FOV to maintain pixel-perfect sizing
+                // 600 is our fixed Z distance
+                this.camera.fov = 2 * Math.atan((this.height / 2) / 600) * (180 / Math.PI);
+                this.camera.updateProjectionMatrix();
+
+                // Recalculate mesh positions based on new DOM flow
+                this.items.forEach(item => {
+                    const bounds = item.img.getBoundingClientRect();
+                    // We need bounds relative to page top (scrolled + rect.top)
+                    // But in loop we use getBoundingClientRect() which is viewport relative,
+                    // plus current scroll offset to get absolute page pos, then subtract current scroll in render loop.
+                    // Easier: Just reuse bounds logic in animate loop or update 'initial' here.
+                });
+            }
+
+            addEventListeners() {
+                window.addEventListener('resize', () => this.updateSize());
+            }
+
+            animate() {
+                // Smooth Scroll Logic (optional, here we just use native scroll)
+                // If you wanted "smooth" scroll, you'd lerp this.scroll.current to window.scrollY
+                this.scroll.current = window.scrollY;
+
+                const time = performance.now() * 0.001;
+
+                this.items.forEach(item => {
+                    // Get live DOM position
+                    // We must call this every frame because layout might shift,
+                    // or just rely on initial calculation - scroll.
+                    // Using getBoundingClientRect every frame is expensive,
+                    // but for < 50 items it's usually fine on modern devices.
+                    // For max perf, calc absolute positions on resize and subtract scroll Y.
+                    const bounds = item.img.getBoundingClientRect();
+
+                    // Update Mesh Dimensions (in case of fluid layout resize)
+                    // Note: Changing scale is cheaper than recreating geometry
+                    item.mesh.scale.set(bounds.width, bounds.height, 1);
+
+                    // Update Position
+                    // Three.js (0,0) is center. HTML (0,0) is top-left.
+                    // Y is inverted.
+                    item.mesh.position.y = -bounds.top + this.height / 2 - bounds.height / 2;
+                    item.mesh.position.x = bounds.left - this.width / 2 + bounds.width / 2;
+
+                    // Update Shader Uniforms
+                    item.mesh.material.uniforms.uTime.value = time;
+                });
+
+                this.renderer.render(this.scene, this.camera);
+                requestAnimationFrame(this.animate.bind(this));
+            }
+        }
+
+        // Initialize when DOM is ready
+        window.addEventListener('DOMContentLoaded', () => {
+            new PortfolioScene();
+        });
+
+    </script>
+</body>
+</html>
